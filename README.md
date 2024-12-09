@@ -2,6 +2,8 @@
 
 #  Databricks Job Execution
 
+Link to the default job on Databricks (Simple ETL): https://dbc-c95fb6bf-a65d.cloud.databricks.com/jobs/914595435648149?o=3670519680858392
+
 ## Overview
 The `main.py` script orchestrates the execution of Databricks jobs for data processing, cleaning, visualization, and reporting. Each job is executed sequentially, and the results are stored in the Databricks environment.
 
@@ -15,7 +17,7 @@ Additionally, `test_main.py` is provided for testing the functionality of `main.
 1. **Databricks Environment**: Ensure you have access to a Databricks workspace.
 2. **Personal Access Token**: Generate a personal access token from Databricks.
 3. **Job Configuration**: Update local `.env` script with the correct Databricks URL and Job IDs.
-Specifically, you should have these in your .env file:
+By default, you should have these in your .env file:
 
 ```{bash}
 DATABRICKS_ACCESS_TOKEN = <Personal Access Token>
