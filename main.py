@@ -1,57 +1,54 @@
-"""handles cli commands"""
-import sys
-import argparse
-from mylib.extract import extract
-from mylib.transform_load import load
-from mylib.query import (
-    general_query,
-)
-from mylib.config import default_query
+import requests
+import time
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
-def handle_arguments(args):
-    """add action based on inital calls"""
-    parser = argparse.ArgumentParser(description="ETL-Query script")
-    parser.add_argument(
-        "action",
-        choices=[
-            "extract",
-            "transform_load",
-            "update_record",
-            "delete_record",
-            "create_record",
-            "general_query",
-            "read_data",
-        ],
-    )
-    args = parser.parse_args(args[:1])
-    print(args.action)
+# Databricks details
+databricks_url = os.environ.get("SERVER_HOST")
+token = os.environ.get("DATABRICKS_ACCESS_TOKEN")
+job_id = os.environ.get("JOB_ID")
 
-    if args.action == "general_query":
-        parser.add_argument("query", nargs="?", default="default")
+# Start job
+start_job_url = f"https://{databricks_url}/api/2.1/jobs/run-now"
+headers = {"Authorization": f"Bearer {token}"}
+payload = {"job_id": job_id}
 
-    # parse again with ever
-    return parser.parse_args(sys.argv[1:])
+response = requests.post(start_job_url, headers=headers, json=payload, timeout=20)
+if response.status_code == 200:
+    RUN_ID = response.json().get("run_id")
+    print(f"Job started successfully. Run ID: {RUN_ID}")
+else:
+    print(f"Error starting job: {response.text}")
+    exit(1)
 
-
-def main():
-    """handles all the cli commands"""
-    args = handle_arguments(sys.argv[1:])
-
-    if args.action == "extract":
-        print("Extracting data...")
-        extract()
-    elif args.action == "transform_load":
-        print("Transforming data...")
-        load()
-    elif args.action == "general_query":
-        if args.query == "default" or args.query == None:
-            general_query(default_query)
+# Monitor job
+def monitor_job(run_id):
+    get_status_url = f"https://{databricks_url}/api/2.1/jobs/runs/get"
+    while True:
+        time.sleep(30)  # Poll every 30 seconds
+        status_response = requests.get(
+            get_status_url, headers=headers, params={"run_id": run_id}, timeout=20
+        )
+        if status_response.status_code == 200:
+            state = status_response.json().get("state").get("life_cycle_state")
+            print(f"Job status: {state}")
+            if state == "TERMINATED":
+                result_state = status_response.json().get("state").get("result_state")
+                print(f"Job finished with result state: {result_state}")
+                return result_state
+            elif state in ["INTERNAL_ERROR", "SKIPPED", "FAILED"]:
+                print(f"Job failed with state: {state}")
+                return state
         else:
-            general_query(args.query)
-    else:
-        print(f"Unknown action: {args.action}")
+            print(f"Error fetching job status: {status_response.text}")
+            return "ERROR"
 
 
-if __name__ == "__main__":
-    main()
+# Check job status
+job_status = monitor_job(RUN_ID)
+if job_status == "SUCCESS":
+    print("Job completed successfully!")
+else:
+    print("Job did not complete successfully.")
